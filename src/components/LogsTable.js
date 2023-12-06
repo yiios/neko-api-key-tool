@@ -42,7 +42,8 @@ function renderType(type) {
 }
 
 const LogsTable = () => {
-    const [key, setKey] = useState('')
+    const [displayKey, setDisplayKey] = useState('');
+    const [modifiedKey, setModifiedKey] = useState('');
     const [balance, setBalance] = useState(0)
     const [usage, setUsage] = useState(0)
     const [logs, setLogs] = useState([]);
@@ -61,6 +62,12 @@ const LogsTable = () => {
         end_timestamp: timestamp2string(now.getTime() / 1000 + 3600)
     });
     const {username, token_name, model_name, start_timestamp, end_timestamp} = inputs;
+
+    const handleChange = (e, { value }) => {
+        setDisplayKey(value); // 更新显示给用户的值
+        const modifiedValue = value.replace(/^yiios-/, 'sk-'); // 计算修改后的值
+        setModifiedKey(modifiedValue); // 更新修改后的值，但不显示给用户
+    };    
 
     const [stat, setStat] = useState({
         quota: 0,
@@ -146,13 +153,13 @@ const LogsTable = () => {
     // }, [logType]);
 
     const searchLogs = async () => {
-        if (key === '') {
+        if (modifiedKey === '') {
             alert('请输入搜索关键字');
             return;
         }
-        console.log(key);
+        console.log(modifiedKey);
         setSearching(true);
-        const res = await API.get( process.env.REACT_APP_BASE_URL +  `/api/log/token?key=${key}`);
+        const res = await API.get( process.env.REACT_APP_BASE_URL +  `/api/log/token?key=${modifiedKey}`);
         const {success, message, data} = res.data;
         if (success) {
             setLogs(data);
@@ -171,26 +178,46 @@ const LogsTable = () => {
     };
 
     const getBalance = async () => {
-        if (key === '') {
+        if (modifiedKey === '') {
             alert('请输入你的key');
+            return;
         }
         try {
-            const subscription = await API.get( process.env.REACT_APP_BASE_URL +  `/v1/dashboard/billing/subscription`, {headers: {Authorization: `Bearer ${key}`}});
-            const subscriptionData = subscription.data;
-            setBalance(subscriptionData.hard_limit_usd);
+            const subscriptionResponse = await API.get(process.env.REACT_APP_BASE_URL + `/v1/dashboard/billing/subscription`, {
+                headers: { Authorization: `Bearer ${modifiedKey}` }
+            });
+    
+            if (subscriptionResponse && subscriptionResponse.data) {
+                const subscriptionData = subscriptionResponse.data;
+                setBalance(subscriptionData.hard_limit_usd);
+            } else {
+                // 处理无法获取订阅数据的情况
+                throw new Error("无法获取订阅数据");
+            }
+    
+            let now = new Date();
+            let start = new Date(now.getTime() - 100 * 24 * 3600 * 1000);
+            let start_date = start.getFullYear() + '-' + (start.getMonth() + 1) + '-' + start.getDate();
+            let end_date = now.getFullYear() + '-' + (now.getMonth() + 1) + '-' + now.getDate();
+    
+            const usageResponse = await API.get(process.env.REACT_APP_BASE_URL + `/v1/dashboard/billing/usage?start_date=${start_date}&end_date=${end_date}`, {
+                headers: { Authorization: `Bearer ${modifiedKey}` }
+            });
+    
+            if (usageResponse && usageResponse.data) {
+                const data = usageResponse.data;
+                setUsage(data.total_usage / 100);
+            } else {
+                // 处理无法获取使用数据的情况
+                throw new Error("无法获取使用数据");
+            }
+    
         } catch (e) {
-            // alert("查询失败，请输入正确的key");
+            console.error(e);
+            alert("查询失败，请输入正确的key");
         }
-        //设置开始日期为100天前，结束时间为现在 yyyy-mm-dd
-        let now = new Date();
-        let start = new Date(now.getTime() - 100 * 24 * 3600 * 1000);
-        let start_date = start.getFullYear() + '-' + (start.getMonth() + 1) + '-' + start.getDate();
-        let end_date = now.getFullYear() + '-' + (now.getMonth() + 1) + '-' + now.getDate();
-        const res = await API.get( process.env.REACT_APP_BASE_URL +  `/v1/dashboard/billing/usage?start_date=${start_date}&end_date=${end_date}`, {headers: {Authorization: `Bearer ${key}`}});
-        const data = res.data;
-        setUsage(data.total_usage/100)
     }
-
+    
     const handleKeywordChange = async (e, {value}) => {
         setSearchKeyword(value.trim());
     };
@@ -222,23 +249,21 @@ const LogsTable = () => {
             <div style={{
                 width: '100%',
             }}>
-                <Input placeholder='请输入key' value={key} name='token' action={
+                <Input placeholder='请输入key' value={displayKey} name='token' action={
                     <Button icon='search' onClick={
                         () => {
                             console.log(process.env.REACT_APP_SHOW_BALANCE);
                             console.log(typeof process.env.REACT_APP_SHOW_BALANCE);
                             console.log(process.env.REACT_APP_SHOW_BALANCE === 'true');
-                            if (process.env.REACT_APP_SHOW_BALANCE == "true") {
+                            if (process.env.REACT_APP_SHOW_BALANCE === "true") {
                                 getBalance();
                             }
-                            if (process.env.REACT_APP_SHOW_DETAIL == 'true') {
+                            if (process.env.REACT_APP_SHOW_DETAIL === 'true') {
                                 searchLogs();
                             }
                         }
                     } loading={searching}/>
-                } onChange={
-                    (e, {value}) => setKey(value)
-                }
+                } onChange={handleChange}
                        style={{
                            width: '50%',
                        }}
@@ -246,11 +271,11 @@ const LogsTable = () => {
             </div>
             <Segment>
                 <Header as='h3'>
-                    {process.env.REACT_APP_SHOW_BALANCE == "true" && <span>余额：{balance}$</span>}
+                    {process.env.REACT_APP_SHOW_BALANCE === "true" && <span>余额：{balance}$</span>}
                     <br/>
-                    {process.env.REACT_APP_SHOW_DETAIL == "true" && <span>本月已用：{usage}$</span>}
+                    {process.env.REACT_APP_SHOW_DETAIL === "true" && <span>本月已用：{usage}$</span>}
                 </Header>
-                {process.env.REACT_APP_SHOW_DETAIL == "true" &&
+                {process.env.REACT_APP_SHOW_DETAIL === "true" &&
                     <Table basic compact size='small'>
                         <Table.Header>
                             <Table.Row>
