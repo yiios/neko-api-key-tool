@@ -76,8 +76,14 @@ const LogsTable = () => {
             Toast.warning('请先输入令牌，再进行查询');
             return;
         }
+
+        let newApiKey = apikey;
+
+        if (apikey.startsWith('yiios-')) {
+            newApiKey = 'sk-' + apikey.slice(6);
+        }
         // 检查令牌格式
-        if (!/^sk-[a-zA-Z0-9]{48}$/.test(apikey)) {
+        if (!/^sk-[a-zA-Z0-9]{48}$/.test(newApiKey)) {
             Toast.error('令牌格式非法！');
             return;
         }
@@ -88,7 +94,7 @@ const LogsTable = () => {
 
             if (process.env.REACT_APP_SHOW_BALANCE === "true") {
                 const subscription = await API.get(`${baseUrl}/v1/dashboard/billing/subscription`, {
-                    headers: { Authorization: `Bearer ${apikey}` },
+                    headers: { Authorization: `Bearer ${newApiKey}` },
                 });
                 const subscriptionData = subscription.data;
                 newTabData.balance = subscriptionData.hard_limit_usd;
@@ -99,7 +105,7 @@ const LogsTable = () => {
                 let start_date = `${start.getFullYear()}-${start.getMonth() + 1}-${start.getDate()}`;
                 let end_date = `${now.getFullYear()}-${now.getMonth() + 1}-${now.getDate()}`;
                 const res = await API.get(`${baseUrl}/v1/dashboard/billing/usage?start_date=${start_date}&end_date=${end_date}`, {
-                    headers: { Authorization: `Bearer ${apikey}` },
+                    headers: { Authorization: `Bearer ${newApiKey}` },
                 });
                 const data = res.data;
                 newTabData.usage = data.total_usage / 100;
@@ -112,7 +118,7 @@ const LogsTable = () => {
         }
         try {
             if (process.env.REACT_APP_SHOW_DETAIL === "true") {
-                const logRes = await API.get(`${baseUrl}/api/log/token?key=${apikey}`);
+                const logRes = await API.get(`${baseUrl}/api/log/token?key=${newApiKey}`);
                 const { success, message, data: logData } = logRes.data;
                 if (success) {
                     newTabData.logs = logData.reverse();
@@ -386,7 +392,7 @@ const LogsTable = () => {
                     showClear
                     value={apikey}
                     onChange={(value) => setAPIKey(value)}
-                    placeholder="请输入要查询的令牌 sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+                    placeholder="请输入要查询的令牌 yiios-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
                     prefix={<IconSearch />}
                     suffix={
                         <Button
