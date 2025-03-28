@@ -109,6 +109,9 @@ const LogsTable = () => {
                 });
                 const data = res.data;
                 newTabData.usage = data.total_usage / 100;
+                if (process.env.REACT_APP_SHOW_DETAIL === "false") {
+                    setActiveKeys(['1']); // 如果只展示余额的话，则直接展开折叠面板
+                }
             }
         } catch (e) {
             console.log(e)
